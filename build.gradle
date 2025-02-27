@@ -1,0 +1,75 @@
+plugins {
+	id 'java'
+	id 'war'
+	id 'org.springframework.boot' version '3.4.3'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.searchFile'
+version = '0.0.1-SNAPSHOT'
+
+ext {
+	springBootVersion = '3.4.3'
+	lombokVersion = '1.18.28'
+	junitJupiterVersion = '5.9.3'
+	slf4jVersion = '1.7.30'
+	kafkaClientsVersion = '2.8.2'
+	commonsVfsVersion = '2.8.0'
+}
+
+/*java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}*/
+java {
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// Spring dependencies
+	implementation "org.springframework.boot:spring-boot-starter-jdbc"
+	implementation "org.springframework.boot:spring-boot-starter-thymeleaf"
+	implementation "org.springframework.boot:spring-boot-starter-web"
+	implementation "org.springframework.boot:spring-boot-starter-web-services"
+	providedRuntime "org.springframework.boot:spring-boot-starter-tomcat"
+
+	// SLF4J Logger dependencies
+	implementation "ch.qos.logback:logback-classic"
+
+	// Lombok dependencies
+	compileOnly "org.projectlombok:lombok:$lombokVersion"
+	annotationProcessor "org.projectlombok:lombok:$lombokVersion"
+	annotationProcessor "org.springframework.boot:spring-boot-configuration-processor"
+
+	// Development tools
+	developmentOnly "org.springframework.boot:spring-boot-devtools"
+
+	// Test dependencies
+	testImplementation "org.springframework.boot:spring-boot-starter-test"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+	implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+
+}
+tasks.register("searchfile") {
+	doLast {
+		println "Running the custom 'searchfile' task..."
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
