@@ -10,4 +10,4 @@ server:
 config:
   sourceDir: "C:/MUCH/fileSync"
   allowedExtensions: txt,jpg,pdf,jpeg,exe,lnk,zip,avi,mp4,mkv,mov,ini
-#  serverUrl
+  serverUrl: "localhost:8081"

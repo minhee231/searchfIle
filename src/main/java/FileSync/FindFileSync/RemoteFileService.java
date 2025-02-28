@@ -1,11 +1,15 @@
 package FileSync.FindFileSync;
 
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -15,11 +19,29 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.*;
 
+@Slf4j
+@Service
 public class RemoteFileService {
 
-    private static final String UPLOAD_URL = "http://localhost:8081/api/files/upload";
-    private static final String DELETE_URL = "http://localhost:8081/api/files/delete";
-    private static final String FILE_EXISTS_URL = "http://localhost:8081/api/files/exists";
+    @Value("${config.serverUrl}")
+    private String serverUrl;
+
+    private static String UPLOAD_URL;
+    private static String DELETE_URL;
+    private static String FILE_EXISTS_URL;
+
+    @PostConstruct
+    public void init() {
+        UPLOAD_URL = "http://" + serverUrl + "/api/files/upload";
+        DELETE_URL = "http://" + serverUrl + "/api/files/delete";
+        FILE_EXISTS_URL = "http://" + serverUrl + "/api/files/exists";
+
+        log.info(FILE_EXISTS_URL);
+    }
+
+//    private static final String UPLOAD_URL = "http:///api/files/upload";
+//    private static final String DELETE_URL = "http://localhost:8081/api/files/delete";
+//    private static final String FILE_EXISTS_URL = "http://localhost:8081/api/files/exists";
 
 
     private final RestTemplate restTemplate = new RestTemplate();

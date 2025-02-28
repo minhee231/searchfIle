@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -37,6 +38,8 @@ class FileSyncController {
 	@Value("#{'${config.allowedExtensions}'.split(',')}")
 	private List<String> allowedExtensions;
 
+	@Autowired
+	private RemoteFileService remoteFileService;
 	private WatchKey watchKey;
 
 	// 감지할 파일 확장자
@@ -48,7 +51,7 @@ class FileSyncController {
 	public void searchfileApplication() throws IOException {
 //		String sourceDir = "C:/MUCH/fileSync"; // 모니터링할 디렉토리
 		/*String targetDir = "/Users/koo29/OneDrive/Desktop/FileBackup"; // 복사할 디렉토리(로컬 테스트)*/
-		RemoteFileService remoteFileService = new RemoteFileService(); // RemoteFileService 인스턴스 생성
+		/*RemoteFileService remoteFileService = new RemoteFileService(); // RemoteFileService 인스턴스 생성*/
 
 		// 1. 최초 실행 시 모든 파일 동기화
 		try {
