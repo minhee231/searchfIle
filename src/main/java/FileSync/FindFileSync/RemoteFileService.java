@@ -17,9 +17,9 @@ import java.util.concurrent.*;
 
 public class RemoteFileService {
 
-    private static final String UPLOAD_URL = "http://3.35.127.162:8081/api/files/upload";
-    private static final String DELETE_URL = "http://3.35.127.162:8081/api/files/delete";
-    private static final String FILE_EXISTS_URL = "http://3.35.127.162:8081/api/files/exists";
+    private static final String UPLOAD_URL = "http://localhost:8081/api/files/upload";
+    private static final String DELETE_URL = "http://localhost:8081/api/files/delete";
+    private static final String FILE_EXISTS_URL = "http://localhost:8081/api/files/exists";
 
 
     private final RestTemplate restTemplate = new RestTemplate();

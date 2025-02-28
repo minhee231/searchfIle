@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: fileSync
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+server:
+  port: 8100
+
+config:
+  sourceDir: "C:/MUCH/fileSync"
+  allowedExtensions: txt,jpg,pdf,jpeg,exe,lnk,zip,avi,mp4,mkv,mov,ini
+#  serverUrl

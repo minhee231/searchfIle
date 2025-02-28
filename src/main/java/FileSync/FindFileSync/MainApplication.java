@@ -2,11 +2,16 @@ package FileSync.FindFileSync;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -21,23 +26,29 @@ public class MainApplication {
 	}
 }
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class FileSyncController {
 
-	private final Logger log = LoggerFactory.getLogger(FileSyncController.class);
+	@Value("${config.sourceDir}")
+	private String sourceDir;
+
+	@Value("#{'${config.allowedExtensions}'.split(',')}")
+	private List<String> allowedExtensions;
+
 	private WatchKey watchKey;
 
 	// 감지할 파일 확장자
-	private static final List<String> allowedExtensions = List.of("txt", "jpg", "pdf", "jpeg", "exe", "lnk", "zip", "avi", "mp4", "mkv", "mov", "ini");
+//	private static final List<String> allowedExtensions = List.of("txt", "jpg", "pdf", "jpeg", "exe", "lnk", "zip", "avi", "mp4", "mkv", "mov", "ini");
+
 
 
 	@PostConstruct
 	public void searchfileApplication() throws IOException {
-		String sourceDir = "C:/Users/LANDSOFT/Desktop/Filesearch"; // 모니터링할 디렉토리
+//		String sourceDir = "C:/MUCH/fileSync"; // 모니터링할 디렉토리
 		/*String targetDir = "/Users/koo29/OneDrive/Desktop/FileBackup"; // 복사할 디렉토리(로컬 테스트)*/
 		RemoteFileService remoteFileService = new RemoteFileService(); // RemoteFileService 인스턴스 생성
-
 
 		// 1. 최초 실행 시 모든 파일 동기화
 		try {
