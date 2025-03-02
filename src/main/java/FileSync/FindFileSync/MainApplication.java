@@ -10,8 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
 
@@ -42,167 +44,92 @@ class FileSyncController {
 	private RemoteFileService remoteFileService;
 	private WatchKey watchKey;
 
-	// 감지할 파일 확장자
-//	private static final List<String> allowedExtensions = List.of("txt", "jpg", "pdf", "jpeg", "exe", "lnk", "zip", "avi", "mp4", "mkv", "mov", "ini");
-
-
+	//테스트
+	@Autowired
+	private TestRemoteService testRemoteService;
 
 	@PostConstruct
 	public void searchfileApplication() throws IOException {
-//		String sourceDir = "C:/MUCH/fileSync"; // 모니터링할 디렉토리
-		/*String targetDir = "/Users/koo29/OneDrive/Desktop/FileBackup"; // 복사할 디렉토리(로컬 테스트)*/
-		/*RemoteFileService remoteFileService = new RemoteFileService(); // RemoteFileService 인스턴스 생성*/
-
-		// 1. 최초 실행 시 모든 파일 동기화
 		try {
 			log.info("최초 동기화를 수행 중...");
 			Path sourcePath = Paths.get(sourceDir);
 
-			try (DirectoryStream<Path> stream = Files.newDirectoryStream(sourcePath)) {
-				stream.forEach(entry -> {
-					if (Files.isRegularFile(entry) && isAllowedExtension(entry)) {
-						String fileName = entry.getFileName().toString();
-
-						CompletableFuture.runAsync(() -> {
-							try {
-								// 서버에 파일 존재 여부 확인
-								if (remoteFileService.fileExistsOnServer(fileName)) {
-									log.info("파일이 이미 서버에 존재함, 업로드 생략: {}", fileName);
-									return; // 서버에 동일한 파일이 존재하면 업로드 생략
-								}
-
-								// 서버에 파일이 없으면 업로드
-								remoteFileService.uploadFile(entry, fileName);
-								log.info("업로드 성공: {}", fileName);
-							} catch (Exception e) {
-								log.error("병렬 업로드 중 오류 발생: {}", fileName, e);
-							}
-						});
+			Files.walkFileTree(sourcePath, new SimpleFileVisitor<>() {
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+					if (Files.isRegularFile(file) && isAllowedExtension(file)) {
+						String fileName = file.getFileName().toString();
+						CompletableFuture.runAsync(() -> uploadIfNotExists(file, fileName));
 					}
-				});
-			}
-
-
-			/*try (DirectoryStream<Path> stream = Files.newDirectoryStream(sourcePath)) { // 원본 디렉토리 순회
-				for (Path entry : stream) {
-					if (Files.isRegularFile(entry) && isAllowedExtension(entry)) { // 파일 확장자 필터링
-						// 로컬 테스트
-						Path targetFilePath = targetPath.resolve(entry.getFileName());
-						Files.copy(entry, targetFilePath, StandardCopyOption.REPLACE_EXISTING);
-						log.info("동기화된 파일: {}", targetFilePath);
-						try {
-							remoteFileService.uploadFile(entry, entry.getFileName().toString());
-						} catch (Exception e) {
-							log.error("파일 업로드 중 오류 발생: {}", entry.getFileName(), e);
-						}
-
-					}
+					return FileVisitResult.CONTINUE;
 				}
-			}*/
+			});
+
 			log.info("최초 동기화 완료!");
-		} catch (IOException e) {
-			log.error("최초 동기화 오류: ", e);
-			throw e;
-		}
 
-		// 2. WatchService 시작
-		try {
 			WatchService watchService = FileSystems.getDefault().newWatchService();
-			log.info("폴더 와치 서비스 시작!");
-
-			Path sourcePath = Paths.get(sourceDir);
-			sourcePath.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
-					StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
+			registerAllDirectories(sourcePath, watchService);
 
 			Thread thread = new Thread(() -> {
 				try {
 					while (true) {
+						WatchKey key;
 						try {
-							watchKey = watchService.take();
+							key = watchService.take();
 						} catch (InterruptedException e) {
 							log.error("와치 서비스 에러: ", e);
 							return;
 						}
 
-						List<WatchEvent<?>> watchEvents = watchKey.pollEvents();
-						for (WatchEvent<?> watchEvent : watchEvents) {
-							WatchEvent.Kind<?> kind = watchEvent.kind();
+						for (WatchEvent<?> event : key.pollEvents()) {
+							WatchEvent.Kind<?> kind = event.kind();
+							Path fileName = (Path) event.context();
+							Path detectedFilePath = ((Path) key.watchable()).resolve(fileName);
+							Path sourceDirPath = Paths.get(sourceDir.replace("\\", "/"));
+							detectedFilePath = sourceDirPath.relativize(detectedFilePath);
 
-							// 감지된 파일 이름과 경로
-							Path fileName = (Path) watchEvent.context();
-							Path detectedFilePath = sourcePath.resolve(fileName);
+							log.info("감지됨: {} - {}", kind.name(), detectedFilePath);
 
-							log.info("감지됨: {} - {}", kind.name(), fileName.getFileName());
 
-							if (!isAllowedExtension(fileName)) {
-								log.info("확장자가 일치하지 않음(무시): {}", fileName.getFileName());
+
+
+							if (Files.isDirectory(detectedFilePath)) {
+								// 새로운 디렉토리가 생기면 WatchService에 등록
+								registerAllDirectories(detectedFilePath, watchService);
 								continue;
 							}
 
-							if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) {
-								// 파일 생성 복사
-								log.info("파일 생성됨: {}", fileName.getFileName());
-								// 로컬 카피 테스트
-								/*try {
-									Path targetPath = Paths.get(targetDir).resolve(fileName);
-									Files.createDirectories(Paths.get(targetDir)); // 대상 폴더가 없을 경우 생성
-									Files.copy(detectedFilePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-									log.info("복사된 파일: {}", targetPath);
-								} catch (IOException e) {
-									log.error("파일 생성 복사 에러: {}", fileName.getFileName(), e);
-								}*/
-								try {
-									Path localFilePath = sourcePath.resolve(fileName);
-									// 업로드 요청
-									remoteFileService.uploadFile(localFilePath, fileName.toString());
-								} catch (Exception e) {
-									log.error("파일 업로드 요청 중 오류 발생: {}", fileName.getFileName(), e);
-								}
+							if (!isAllowedExtension(fileName)) {
+								log.info("확장자가 일치하지 않음(무시): {}", fileName);
+								continue;
+							}
 
-							} else if (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
-								// 파일 수정 복사
-								log.info("파일 수정됨: {}", fileName.getFileName());
-								// 로컬 카피 테스트
-								/*try {
-									Path targetPath = Paths.get(targetDir).resolve(fileName);
-									Files.createDirectories(Paths.get(targetDir)); // 대상 폴더가 없을 경우 생성
-									Files.copy(detectedFilePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-									log.info("복사된 파일: {}", targetPath);
-								} catch (IOException e) {
-									log.error("파일 수정 복사 에러: {}", fileName.getFileName(), e);
-								}*/
+
+							if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) ||
+									kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
 								try {
+									log.info(String.valueOf(detectedFilePath));
+
 									Path localFilePath = sourcePath.resolve(fileName);
-									// 업로드 요청
-									remoteFileService.uploadFile(localFilePath, fileName.toString());
+//									remoteFileService.uploadFile(detectedFilePath, fileName.toString());
+//									remoteFileService.uploadFile(localFilePath, fileName.toString());
+									FileSystemResource fileResource = new FileSystemResource(localFilePath.toFile());
+									//testRemoteService.test(fileResource, String.valueOf(fileName), localFilePath.toString() );
+									testRemoteService.test(localFilePath, fileName.toString());
+
 								} catch (Exception e) {
-									log.error("파일 업로드 요청 중 오류 발생: {}", fileName.getFileName(), e);
+									log.error("파일 업로드 요청 중 오류 발생: {}", detectedFilePath, e);
 								}
 							} else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
-								// 파일 삭제 처리
-								log.info("파일 삭제됨: {}", fileName.getFileName());
-								// 로컬 삭제 테스트
-								/*try {
-									Path targetPath = Paths.get(targetDir).resolve(fileName);
-									if (Files.deleteIfExists(targetPath)) {
-										log.info("타겟 폴더에서 파일 삭제됨: {}", targetPath);
-									} else {
-										log.warn("타겟 폴더에서 파일을 찾을 수 없음: {}", targetPath);
-									}
-								} catch (IOException e) {
-									log.error("타겟 폴더 파일 삭제 에러: {}", fileName.getFileName(), e);
-								}*/
 								try {
-									// 삭제 요청
 									remoteFileService.deleteFile(fileName.toString());
 								} catch (Exception e) {
-									log.error("파일 삭제 요청 중 오류 발생: {}", fileName.getFileName(), e);
+									log.error("파일 삭제 요청 중 오류 발생: {}", fileName, e);
 								}
-
 							}
 						}
 
-						if (!watchKey.reset()) {
+						if (!key.reset()) {
 							log.warn("WatchKey could not be reset. Exiting...");
 							watchService.close();
 							break;
@@ -222,15 +149,76 @@ class FileSyncController {
 		}
 	}
 
+	private void registerAllDirectories(Path start, WatchService watchService) throws IOException {
+		Files.walkFileTree(start, new SimpleFileVisitor<>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+				dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
+						StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
+				log.info("디렉토리 감시 등록됨: {}", dir);
+				return FileVisitResult.CONTINUE;
+			}
+		});
+	}
+
+	private void uploadIfNotExists(Path entry, String fileName) {
+		try {
+			if (remoteFileService.fileExistsOnServer(fileName)) {
+				log.info("파일이 이미 서버에 존재함, 업로드 생략: {}", fileName);
+				return;
+			}
+			remoteFileService.uploadFile(entry, fileName);
+			log.info("업로드 성공: {}", fileName);
+		} catch (Exception e) {
+			log.error("병렬 업로드 중 오류 발생: {}", fileName, e);
+		}
+	}
+
+
 	// 파일 확장자 필터링 로직
+//	private boolean isAllowedExtension(Path file) {
+//		String fileName = file.toAbsolutePath().toString(); // 전체 경로를 가져옴
+//		int lastDotIndex = fileName.lastIndexOf(".");
+//		if (lastDotIndex == -1) {
+//			return false; // 확장자가 없는 경우
+//		}
+//		// 파일 확장자를 소문자로 변환하여 필터링
+//		String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase();
+//		return allowedExtensions.contains(fileExtension);
+//	}
+
+	// 허용된 경로인지 확인하는 메서드 추가
+	private boolean isAllowedPath(Path file) {
+		try {
+			Path absolutePath = file.toAbsolutePath().normalize(); // 절대 경로 변환
+			Path rootPath = Paths.get(sourceDir).toAbsolutePath().normalize(); // 루트 디렉토리 절대 경로
+
+			return absolutePath.getParent().equals(rootPath); // 부모 경로가 sourceDir과 동일한지 확인
+		} catch (Exception e) {
+			log.error("경로 검사 중 오류 발생: {}", file, e);
+			return false;
+		}
+	}
+
+	// 기존 확장자 검사 메서드 수정
 	private boolean isAllowedExtension(Path file) {
+//		if (!isAllowedPath(file)) {
+//			log.info("파일이 허용된 루트 디렉토리에 없음(무시): {}", file);
+//			return false;
+//		}
+
 		String fileName = file.getFileName().toString();
 		int lastDotIndex = fileName.lastIndexOf(".");
+
 		if (lastDotIndex == -1) {
-			return false; // 확장자가 없는 경우
+			log.info("확장자가 없는 파일(무시): {}", fileName);
+			return false;
 		}
-		// 파일 확장자를 소문자로 변환하여 필터링
-		String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase();
+
+		String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase().trim();
+		log.info("파일명: {}, 추출된 확장자: {}", fileName, fileExtension);
+
+
 		return allowedExtensions.contains(fileExtension);
 	}
 

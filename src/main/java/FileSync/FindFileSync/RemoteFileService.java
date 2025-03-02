@@ -32,7 +32,8 @@ public class RemoteFileService {
 
     @PostConstruct
     public void init() {
-        UPLOAD_URL = "http://" + serverUrl + "/api/files/upload";
+        //UPLOAD_URL = "http://" + serverUrl + "/api/files/upload";
+        UPLOAD_URL = "http://" + serverUrl + "/file/upload";
         DELETE_URL = "http://" + serverUrl + "/api/files/delete";
         FILE_EXISTS_URL = "http://" + serverUrl + "/api/files/exists";
 
@@ -57,7 +58,8 @@ public class RemoteFileService {
     public void uploadFile(Path localFilePath, String fileName) {
         try {
             String fileKey = localFilePath.toString(); // 파일의 경로를 Key로 사용
-
+            log.info("Uploading file " + fileName);
+            //log.info(fileKey);
             // 기존 예약 작업이 있다면 취소
             if (debounceMap.containsKey(fileKey)) {
                 debounceMap.get(fileKey).cancel(false);
@@ -70,17 +72,17 @@ public class RemoteFileService {
 
                     // 요청 body 생성
                     MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-                    body.add("file", fileResource);
-                    body.add("relativePath", fileName);
+                    body.add("file", fileResource); // file을 멀티파트로 추가
+                    body.add("path", localFilePath); // 추가적인 데이터도 멀티파트로 추가
 
-                    // 요청 헤더 생성
                     HttpHeaders headers = new HttpHeaders();
-                    headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+                    headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 반드시 MULTIPART_FORM_DATA 설정
 
                     HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-                    // POST 요청 전송
+// 업로드 URL에 대한 요청을 보냄
                     ResponseEntity<String> response = restTemplate.postForEntity(UPLOAD_URL, requestEntity, String.class);
+
 
                     if (response.getStatusCode() == HttpStatus.OK) {
                         System.out.println("파일 업로드 성공: " + fileName);

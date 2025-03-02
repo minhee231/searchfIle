@@ -3,6 +3,11 @@ spring:
     name: fileSync
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 1GB  # 최대 파일 크기 1GB로 설정
+      max-request-size: 1GB  # 최대 요청 크기 1GB로 설정
 
 server:
   port: 8100
