@@ -1,4 +1,4 @@
-package FileSync.FindFileSync;
+package FileSync.FindFileSync.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
