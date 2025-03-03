@@ -38,7 +38,7 @@ public class RemoteFileService {
         //UPLOAD_URL = "http://" + serverUrl + "/api/files/upload";
         UPLOAD_URL = "http://" + serverUrl + "/file/upload";
         DELETE_URL = "http://" + serverUrl + "/file/delete";
-        FILE_EXISTS_URL = "http://" + serverUrl + "/api/files/exists";
+        FILE_EXISTS_URL = "http://" + serverUrl + "/file/exists";
 
         log.info(FILE_EXISTS_URL);
     }
@@ -127,9 +127,9 @@ public class RemoteFileService {
             System.err.println("파일 삭제 중 오류 발생: " + e.getMessage());
         }
     }
-    public boolean fileExistsOnServer(String fileName) {
+    public boolean fileExistsOnServer(String path) {
         try {
-            ResponseEntity<Boolean> response = restTemplate.getForEntity(FILE_EXISTS_URL + "?fileName=" + fileName, Boolean.class);
+            ResponseEntity<Boolean> response = restTemplate.getForEntity(FILE_EXISTS_URL + "?path=" + path, Boolean.class);
             return Boolean.TRUE.equals(response.getBody());
         } catch (Exception e) {
             System.err.println("파일 존재 여부 확인 중 오류 발생: " + e.getMessage());

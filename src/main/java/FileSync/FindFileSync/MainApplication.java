@@ -55,7 +55,8 @@ class FileSyncController {
 				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 					if (Files.isRegularFile(file) && isAllowedExtension(file)) {
 						String fileName = file.getFileName().toString();
-						CompletableFuture.runAsync(() -> uploadIfNotExists(file, fileName));
+						CompletableFuture.runAsync(() -> uploadIfNotExists(file, file.toFile().getPath()));
+						log.info(file.toFile().getPath());
 					}
 					return FileVisitResult.CONTINUE;
 				}
