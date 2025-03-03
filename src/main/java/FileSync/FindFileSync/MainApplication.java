@@ -57,6 +57,7 @@ class FileSyncController {
 						String fileName = file.getFileName().toString();
 						CompletableFuture.runAsync(() -> uploadIfNotExists(file, file.toFile().getPath()));
 						log.info(file.toFile().getPath());
+						log.info(fileName);
 					}
 					return FileVisitResult.CONTINUE;
 				}
@@ -154,16 +155,16 @@ class FileSyncController {
 		});
 	}
 
-	private void uploadIfNotExists(Path entry, String fileName) {
+	private void uploadIfNotExists(Path entry, String path) {
 		try {
-			if (remoteFileService.fileExistsOnServer(fileName)) {
-				log.info("파일이 이미 서버에 존재함, 업로드 생략: {}", fileName);
+			if (remoteFileService.fileExistsOnServer(path)) {
+				log.info("파일이 이미 서버에 존재함, 업로드 생략: {}", path);
 				return;
 			}
-			remoteFileService.uploadFile(entry, fileName);
-			log.info("업로드 성공: {}", fileName);
+			remoteFileService.uploadFile(entry, path);
+			log.info("업로드 성공: {}", path);
 		} catch (Exception e) {
-			log.error("병렬 업로드 중 오류 발생: {}", fileName, e);
+			log.error("병렬 업로드 중 오류 발생: {}", path, e);
 		}
 	}
 

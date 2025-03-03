@@ -13,6 +13,6 @@ server:
   port: 8100
 
 config:
-  sourceDir: "C:/MUCH/fileSync" #서버에서 가져올 파일 루트 디렉토리
+  sourceDir: "C:/MUCH/fileSync" #탐색할 디렉토리
   allowedExtensions: txt,jpg,pdf,jpeg,exe,lnk,zip,avi,mp4,mkv,mov,ini
   serverUrl: "localhost:8081"

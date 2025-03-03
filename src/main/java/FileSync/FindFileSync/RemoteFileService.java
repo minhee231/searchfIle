@@ -128,6 +128,7 @@ public class RemoteFileService {
         }
     }
     public boolean fileExistsOnServer(String path) {
+        path = path.substring(sourceDir.length());
         try {
             ResponseEntity<Boolean> response = restTemplate.getForEntity(FILE_EXISTS_URL + "?path=" + path, Boolean.class);
             return Boolean.TRUE.equals(response.getBody());
