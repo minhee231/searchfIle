@@ -114,7 +114,7 @@ class FileSyncController {
 							// 파일 삭제 시 삭제 처리
 							else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
 								try {
-									remoteFileService.deleteFile(fileName.toString());
+									remoteFileService.deleteFile(detectedFilePath.toString());
 								} catch (Exception e) {
 									log.error("파일 삭제 요청 중 오류 발생: {}", fileName, e);
 								}

@@ -37,7 +37,7 @@ public class RemoteFileService {
     public void init() {
         //UPLOAD_URL = "http://" + serverUrl + "/api/files/upload";
         UPLOAD_URL = "http://" + serverUrl + "/file/upload";
-        DELETE_URL = "http://" + serverUrl + "/api/files/delete";
+        DELETE_URL = "http://" + serverUrl + "/file/delete";
         FILE_EXISTS_URL = "http://" + serverUrl + "/api/files/exists";
 
         log.info(FILE_EXISTS_URL);
@@ -75,12 +75,8 @@ public class RemoteFileService {
 
                     // 요청 body 생성
                     MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-//                    body.set("path", fileKey); // fileKey를 String으로 전달
-                    body.add("file", fileResource); // file을 멀티파트로 추가
-                    //body.set("path", fileResource.getPath());
+                    body.add("file", fileResource);
                     body.set("path", fileResource.getPath().substring(sourceDir.length()));
-                    //body.add("path", fileKey); // 추가적인 데이터도 멀티파트로 추가
-
 
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 반드시 MULTIPART_FORM_DATA 설정
@@ -109,20 +105,20 @@ public class RemoteFileService {
     }
 
     // 파일 삭제 요청
-    public void deleteFile(String fileName) {
+    public void deleteFile(String filePath) {
         try {
             // 요청 body 생성
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            Map<String, String> body = Map.of("fileName", fileName);
+            Map<String, String> body = Map.of("path", filePath.substring(sourceDir.length()));
             HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
 
             // DELETE 요청 전송
             ResponseEntity<String> response = restTemplate.exchange(DELETE_URL, HttpMethod.DELETE, requestEntity, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK) {
-                System.out.println("파일 삭제 성공: " + fileName);
+                System.out.println("파일 삭제 성공: " + filePath);
             } else {
                 System.out.println("파일 삭제 실패: " + response.getBody());
             }
