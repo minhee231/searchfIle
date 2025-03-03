@@ -42,11 +42,6 @@ class FileSyncController {
 
 	@Autowired
 	private RemoteFileService remoteFileService;
-	private WatchKey watchKey;
-
-	//테스트
-	@Autowired
-	private TestRemoteService testRemoteService;
 
 	@PostConstruct
 	public void searchfileApplication() throws IOException {
@@ -54,6 +49,7 @@ class FileSyncController {
 			log.info("최초 동기화를 수행 중...");
 			Path sourcePath = Paths.get(sourceDir);
 
+			// 최초 동기화: 기존 파일들을 확인하여 업로드
 			Files.walkFileTree(sourcePath, new SimpleFileVisitor<>() {
 				@Override
 				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
@@ -67,9 +63,11 @@ class FileSyncController {
 
 			log.info("최초 동기화 완료!");
 
+			// WatchService 설정
 			WatchService watchService = FileSystems.getDefault().newWatchService();
 			registerAllDirectories(sourcePath, watchService);
 
+			// 파일 변화 감지
 			Thread thread = new Thread(() -> {
 				try {
 					while (true) {
@@ -85,42 +83,36 @@ class FileSyncController {
 							WatchEvent.Kind<?> kind = event.kind();
 							Path fileName = (Path) event.context();
 							Path detectedFilePath = ((Path) key.watchable()).resolve(fileName);
-							Path sourceDirPath = Paths.get(sourceDir.replace("\\", "/"));
-							detectedFilePath = sourceDirPath.relativize(detectedFilePath);
 
 							log.info("감지됨: {} - {}", kind.name(), detectedFilePath);
 
-
-
-
+							// 디렉토리 감지 시 등록
 							if (Files.isDirectory(detectedFilePath)) {
-								// 새로운 디렉토리가 생기면 WatchService에 등록
 								registerAllDirectories(detectedFilePath, watchService);
 								continue;
 							}
 
+							// 확장자 체크
 							if (!isAllowedExtension(fileName)) {
 								log.info("확장자가 일치하지 않음(무시): {}", fileName);
 								continue;
 							}
 
-
+							// 파일 생성, 수정 시 업로드
 							if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) ||
 									kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
 								try {
-									log.info(String.valueOf(detectedFilePath));
+									log.info("업로드 처리: {}", detectedFilePath);
+									Path localFilePath = sourcePath.resolve(fileName); // 파일 경로 수정
 
-									Path localFilePath = sourcePath.resolve(fileName);
-//									remoteFileService.uploadFile(detectedFilePath, fileName.toString());
-//									remoteFileService.uploadFile(localFilePath, fileName.toString());
-									FileSystemResource fileResource = new FileSystemResource(localFilePath.toFile());
-									//testRemoteService.test(fileResource, String.valueOf(fileName), localFilePath.toString() );
-									testRemoteService.test(localFilePath, fileName.toString());
-
+									// 업로드 실행
+									remoteFileService.uploadFile(detectedFilePath, fileName.toString());
 								} catch (Exception e) {
 									log.error("파일 업로드 요청 중 오류 발생: {}", detectedFilePath, e);
 								}
-							} else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
+							}
+							// 파일 삭제 시 삭제 처리
+							else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
 								try {
 									remoteFileService.deleteFile(fileName.toString());
 								} catch (Exception e) {
@@ -174,39 +166,8 @@ class FileSyncController {
 		}
 	}
 
-
-	// 파일 확장자 필터링 로직
-//	private boolean isAllowedExtension(Path file) {
-//		String fileName = file.toAbsolutePath().toString(); // 전체 경로를 가져옴
-//		int lastDotIndex = fileName.lastIndexOf(".");
-//		if (lastDotIndex == -1) {
-//			return false; // 확장자가 없는 경우
-//		}
-//		// 파일 확장자를 소문자로 변환하여 필터링
-//		String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase();
-//		return allowedExtensions.contains(fileExtension);
-//	}
-
-	// 허용된 경로인지 확인하는 메서드 추가
-	private boolean isAllowedPath(Path file) {
-		try {
-			Path absolutePath = file.toAbsolutePath().normalize(); // 절대 경로 변환
-			Path rootPath = Paths.get(sourceDir).toAbsolutePath().normalize(); // 루트 디렉토리 절대 경로
-
-			return absolutePath.getParent().equals(rootPath); // 부모 경로가 sourceDir과 동일한지 확인
-		} catch (Exception e) {
-			log.error("경로 검사 중 오류 발생: {}", file, e);
-			return false;
-		}
-	}
-
-	// 기존 확장자 검사 메서드 수정
+	// 확장자 필터링 메서드
 	private boolean isAllowedExtension(Path file) {
-//		if (!isAllowedPath(file)) {
-//			log.info("파일이 허용된 루트 디렉토리에 없음(무시): {}", file);
-//			return false;
-//		}
-
 		String fileName = file.getFileName().toString();
 		int lastDotIndex = fileName.lastIndexOf(".");
 
@@ -218,8 +179,6 @@ class FileSyncController {
 		String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase().trim();
 		log.info("파일명: {}, 추출된 확장자: {}", fileName, fileExtension);
 
-
 		return allowedExtensions.contains(fileExtension);
 	}
-
 }

@@ -26,6 +26,9 @@ public class RemoteFileService {
     @Value("${config.serverUrl}")
     private String serverUrl;
 
+    @Value("${config.sourceDir}")
+    private String sourceDir;
+
     private static String UPLOAD_URL;
     private static String DELETE_URL;
     private static String FILE_EXISTS_URL;
@@ -72,15 +75,19 @@ public class RemoteFileService {
 
                     // 요청 body 생성
                     MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+//                    body.set("path", fileKey); // fileKey를 String으로 전달
                     body.add("file", fileResource); // file을 멀티파트로 추가
-                    body.add("path", localFilePath); // 추가적인 데이터도 멀티파트로 추가
+                    //body.set("path", fileResource.getPath());
+                    body.set("path", fileResource.getPath().substring(sourceDir.length()));
+                    //body.add("path", fileKey); // 추가적인 데이터도 멀티파트로 추가
+
 
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 반드시 MULTIPART_FORM_DATA 설정
 
                     HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-// 업로드 URL에 대한 요청을 보냄
+
                     ResponseEntity<String> response = restTemplate.postForEntity(UPLOAD_URL, requestEntity, String.class);
 
 
