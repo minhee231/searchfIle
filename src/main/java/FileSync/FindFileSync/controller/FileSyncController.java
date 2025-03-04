@@ -84,19 +84,6 @@ public class FileSyncController {
                                 continue;
                             }
 
-                            // 폴더 이름 변경 감지
-                            if (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY) && Files.isDirectory(detectedFilePath)) {
-                                log.info("디렉토리 변경 감지됨: {}", detectedFilePath);
-
-                                // 기존 경로를 새로운 경로로 업데이트
-                                Path parentDir = detectedFilePath.getParent();
-                                if (parentDir != null) {
-                                    //registerAllDirectories(parentDir, watchService);
-                                    registerAllDirectories(parentDir, watchService);
-                                }
-                                continue;
-                            }
-
                             // 확장자 체크
                             if (!isAllowedExtension(fileName)) {
                                 log.info("확장자가 일치하지 않음(무시): {}", fileName);
@@ -105,10 +92,10 @@ public class FileSyncController {
 
 
                             // 파일 생성 시
-                            if ((kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) ||
-                                    (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY))) {
+                            if ((kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) || (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY))) {
                                 try {
                                     if (Files.isDirectory(detectedFilePath)) {
+                                        // 디렉토리명 변경 시 새로운 경로로 업로드 처리
                                         remoteFileService.uploadDir(detectedFilePath);
                                     }
                                     log.info("업로드 처리: {}", detectedFilePath);
@@ -120,6 +107,17 @@ public class FileSyncController {
                                 }
                             }
 
+                            // 폴더 이름 변경 감지
+                            if (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY) && Files.isDirectory(detectedFilePath)) {
+                                log.info("디렉토리 변경 감지됨: {}", detectedFilePath);
+
+                                // 디렉토리명을 변경한 경우 새 경로로 업데이트
+                                Path newDirectoryPath = detectedFilePath.getParent();
+                                if (newDirectoryPath != null) {
+                                    // 새로운 경로로 파일 업로드
+                                    uploadFilesInDirectory(newDirectoryPath);
+                                }
+                            }
 
                             // 파일 삭제 시 삭제 처리
                             else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
@@ -199,6 +197,7 @@ public class FileSyncController {
         // 파일이 존재하지 않지만 이름을 기준으로 디렉토리로 간주할 수 있음
         if (!f.exists() || f.isDirectory()) {
             log.info("디렉토리 감지: {}", file);
+            remoteFileService.deleteDir(file.toString());
             return true;
         }
 

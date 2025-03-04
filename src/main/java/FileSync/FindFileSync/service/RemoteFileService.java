@@ -174,7 +174,7 @@ public class RemoteFileService {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            Map<String, String> body = Map.of("path", path.substring(sourceDir.length()));
+            Map<String, String> body = Map.of("path","\\" + path);
             HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
 
             // DELETE 요청 전송
