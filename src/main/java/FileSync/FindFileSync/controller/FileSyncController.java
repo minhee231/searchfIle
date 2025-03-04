@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -61,6 +62,7 @@ public class FileSyncController {
                         WatchKey key;
                         try {
                             key = watchService.take();
+
                         } catch (InterruptedException e) {
                             log.error("와치 서비스 에러: ", e);
                             return;
@@ -69,13 +71,28 @@ public class FileSyncController {
                         for (WatchEvent<?> event : key.pollEvents()) {
                             WatchEvent.Kind<?> kind = event.kind();
                             Path fileName = (Path) event.context();
+                            log.info(key.watchable().toString());
                             Path detectedFilePath = ((Path) key.watchable()).resolve(fileName);
 
                             log.info("감지됨: {} - {}", kind.name(), detectedFilePath);
 
-                            // 디렉토리 감지 시 등록
-                            if (Files.isDirectory(detectedFilePath)) {
+                            // 디렉토리 감지 시, 새 경로로 업데이트
+                            if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) && Files.isDirectory(detectedFilePath)) {
+                                log.info("새 디렉토리 생성 감지됨: {}", detectedFilePath);
                                 registerAllDirectories(detectedFilePath, watchService);
+                                continue;
+                            }
+
+                            // 폴더 이름 변경 감지
+                            if (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY) && Files.isDirectory(detectedFilePath)) {
+                                log.info("디렉토리 변경 감지됨: {}", detectedFilePath);
+
+                                // 기존 경로를 새로운 경로로 업데이트
+                                Path parentDir = detectedFilePath.getParent();
+                                if (parentDir != null) {
+                                    //registerAllDirectories(parentDir, watchService);
+                                    registerAllDirectories(parentDir, watchService);
+                                }
                                 continue;
                             }
 
@@ -85,12 +102,15 @@ public class FileSyncController {
                                 continue;
                             }
 
+
                             // 파일 생성, 수정 시 업로드
                             if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) ||
                                     kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
                                 try {
+                                    if (Files.isDirectory(detectedFilePath)) {
+                                        remoteFileService.uploadDir(detectedFilePath);
+                                    }
                                     log.info("업로드 처리: {}", detectedFilePath);
-                                    Path localFilePath = sourcePath.resolve(fileName); // 파일 경로 수정
 
                                     // 업로드 실행
                                     remoteFileService.uploadFile(detectedFilePath, fileName.toString());
@@ -128,17 +148,33 @@ public class FileSyncController {
         }
     }
 
-    private void registerAllDirectories(Path start, WatchService watchService) throws IOException {
-        Files.walkFileTree(start, new SimpleFileVisitor<>() {
+//    private void registerAllDirectories(Path start, WatchService watchService) throws IOException {
+//        Files.walkFileTree(start, new SimpleFileVisitor<>() {
+//            @Override
+//            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+//                dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
+//                        StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
+//                log.info("디렉토리 감시 등록됨: {}", dir);
+//                return FileVisitResult.CONTINUE;
+//            }
+//        });
+//    }
+
+    private Path registerAllDirectories(Path start, WatchService watchService) throws IOException {
+        Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                 dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
-                        StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
-                log.info("디렉토리 감시 등록됨: {}", dir);
+                        StandardWatchEventKinds.ENTRY_DELETE,
+                        StandardWatchEventKinds.ENTRY_MODIFY);
+                        remoteFileService.uploadDir(dir);
                 return FileVisitResult.CONTINUE;
             }
         });
+        return start; // 등록된 디렉토리의 Path 반환
     }
+
+
 
     private void uploadIfNotExists(Path entry, String path) {
         try {
@@ -155,12 +191,21 @@ public class FileSyncController {
 
     // 확장자 필터링 메서드
     private boolean isAllowedExtension(Path file) {
+        File f = file.toFile();
+
+        // 파일이 존재하지 않지만 이름을 기준으로 디렉토리로 간주할 수 있음
+        if (!f.exists() || f.isDirectory()) {
+            log.info("디렉토리 감지: {}", file);
+            return true;
+        }
+
         String fileName = file.getFileName().toString();
         int lastDotIndex = fileName.lastIndexOf(".");
 
+        // 확장자가 없는 경우 (디렉토리일 가능성이 높음)
         if (lastDotIndex == -1) {
             log.info("확장자가 없는 파일(무시): {}", fileName);
-            return false;
+            return true; // 디렉토리로 간주
         }
 
         String fileExtension = fileName.substring(lastDotIndex + 1).toLowerCase().trim();
@@ -168,4 +213,6 @@ public class FileSyncController {
 
         return allowedExtensions.contains(fileExtension);
     }
+
+
 }

@@ -32,6 +32,8 @@ public class RemoteFileService {
     private static String UPLOAD_URL;
     private static String DELETE_URL;
     private static String FILE_EXISTS_URL;
+    private static String UPDATE_DIR_URL;
+
 
     @PostConstruct
     public void init() {
@@ -39,6 +41,7 @@ public class RemoteFileService {
         UPLOAD_URL = "http://" + serverUrl + "/file/upload";
         DELETE_URL = "http://" + serverUrl + "/file/delete";
         FILE_EXISTS_URL = "http://" + serverUrl + "/file/exists";
+        UPDATE_DIR_URL = "http://" + serverUrl + "/file/update/dir";
 
         log.info(FILE_EXISTS_URL);
     }
@@ -56,6 +59,30 @@ public class RemoteFileService {
 
     // 최신 요청만 실행하기 위해 사용할 디바운스 대기 시간 (밀리초)
     private static final int DEBOUNCE_DELAY_MILLIS = 5000;
+
+    public void uploadDir(Path path) {
+        String filePath = path.toString();
+        try {
+            // 요청 body 생`성
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> body = Map.of("path", filePath.substring(sourceDir.length()));
+            HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
+
+            // Update 요청 전송
+            ResponseEntity<String> response = restTemplate.exchange(UPDATE_DIR_URL, HttpMethod.POST, requestEntity, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                System.out.println("디렉토리 업데이트 성공: " + filePath);
+            } else {
+                System.out.println("디렉토리 업데이트 실패: " + response.getBody());
+            }
+
+        } catch (Exception e) {
+            System.err.println("디렉토리 업데이트 중 오류 발생: " + e.getMessage());
+        }
+    }
 
     // 파일 업로드 요청
     public void uploadFile(Path localFilePath, String fileName) {
