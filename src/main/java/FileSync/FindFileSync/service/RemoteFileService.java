@@ -33,6 +33,7 @@ public class RemoteFileService {
     private static String DELETE_URL;
     private static String FILE_EXISTS_URL;
     private static String UPDATE_DIR_URL;
+    private static String DELETE_DIR_URL;
 
 
     @PostConstruct
@@ -42,6 +43,8 @@ public class RemoteFileService {
         DELETE_URL = "http://" + serverUrl + "/file/delete";
         FILE_EXISTS_URL = "http://" + serverUrl + "/file/exists";
         UPDATE_DIR_URL = "http://" + serverUrl + "/file/update/dir";
+        DELETE_DIR_URL = "http://" + serverUrl + "/file/deleteDirectory";
+
 
         log.info(FILE_EXISTS_URL);
     }
@@ -163,6 +166,30 @@ public class RemoteFileService {
             System.err.println("파일 존재 여부 확인 중 오류 발생: " + e.getMessage());
             return false; // 서버 확인 실패 시 기본값으로 false 반환
         }
+    }
+
+    public void deleteDir(String path) {
+        try {
+            // 요청 body 생성
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> body = Map.of("path", path.substring(sourceDir.length()));
+            HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(body, headers);
+
+            // DELETE 요청 전송
+            ResponseEntity<String> response = restTemplate.exchange(DELETE_DIR_URL, HttpMethod.DELETE, requestEntity, String.class);
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                System.out.println("디렉토리 삭제 성공: " + path);
+            } else {
+                System.out.println("디렉토리 삭제 실패: " + response.getBody());
+            }
+
+        } catch (Exception e) {
+            System.err.println("디렉토리 삭제 중 오류 발생: " + e.getMessage());
+        }
+
     }
 
 }

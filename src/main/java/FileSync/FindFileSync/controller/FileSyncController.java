@@ -80,6 +80,7 @@ public class FileSyncController {
                             if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) && Files.isDirectory(detectedFilePath)) {
                                 log.info("새 디렉토리 생성 감지됨: {}", detectedFilePath);
                                 registerAllDirectories(detectedFilePath, watchService);
+                                uploadFilesInDirectory(detectedFilePath);
                                 continue;
                             }
 
@@ -103,9 +104,9 @@ public class FileSyncController {
                             }
 
 
-                            // 파일 생성, 수정 시 업로드
-                            if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) ||
-                                    kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
+                            // 파일 생성 시
+                            if ((kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) ||
+                                    (kind.equals(StandardWatchEventKinds.ENTRY_MODIFY))) {
                                 try {
                                     if (Files.isDirectory(detectedFilePath)) {
                                         remoteFileService.uploadDir(detectedFilePath);
@@ -118,6 +119,8 @@ public class FileSyncController {
                                     log.error("파일 업로드 요청 중 오류 발생: {}", detectedFilePath, e);
                                 }
                             }
+
+
                             // 파일 삭제 시 삭제 처리
                             else if (kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
                                 try {
@@ -212,6 +215,24 @@ public class FileSyncController {
         log.info("파일명: {}, 추출된 확장자: {}", fileName, fileExtension);
 
         return allowedExtensions.contains(fileExtension);
+    }
+
+    private void uploadFilesInDirectory(Path directory) {
+        try {
+            Files.walk(directory) // 디렉토리 내 모든 파일과 서브디렉토리 순회
+                    .filter(Files::isRegularFile) // 파일만 필터링
+                    .filter(this::isAllowedExtension) // 확장자가 허용된 파일만 처리
+                    .forEach(file -> {
+                        try {
+                            log.info("업로드 처리: {}", file);
+                            remoteFileService.uploadFile(file, file.getFileName().toString()); // 파일 업로드
+                        } catch (Exception e) {
+                            log.error("파일 업로드 중 오류 발생: {}", file, e);
+                        }
+                    });
+        } catch (IOException e) {
+            log.error("디렉토리 내 파일 업로드 중 오류 발생: {}", directory, e);
+        }
     }
 
 
