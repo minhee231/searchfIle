@@ -52,8 +52,8 @@ public class FileSyncController {
             log.info("최초 동기화 완료!");
 
             // WatchService 설정
-            WatchService watchService = FileSystems.getDefault().newWatchService();
-            registerAllDirectories(sourcePath, watchService);
+            final WatchService[] watchService = {FileSystems.getDefault().newWatchService()};
+            registerAllDirectories(sourcePath, watchService[0]);
 
             // 파일 변화 감지
             Thread thread = new Thread(() -> {
@@ -61,7 +61,7 @@ public class FileSyncController {
                     while (true) {
                         WatchKey key;
                         try {
-                            key = watchService.take();
+                            key = watchService[0].take();
 
                         } catch (InterruptedException e) {
                             log.error("와치 서비스 에러: ", e);
@@ -79,7 +79,7 @@ public class FileSyncController {
                             // 디렉토리 감지 시, 새 경로로 업데이트
                             if (kind.equals(StandardWatchEventKinds.ENTRY_CREATE) && Files.isDirectory(detectedFilePath)) {
                                 log.info("새 디렉토리 생성 감지됨: {}", detectedFilePath);
-                                registerAllDirectories(detectedFilePath, watchService);
+                                registerAllDirectories(detectedFilePath, watchService[0]);
                                 uploadFilesInDirectory(detectedFilePath);
                                 continue;
                             }
@@ -129,11 +129,32 @@ public class FileSyncController {
                             }
                         }
 
-                        if (!key.reset()) {
-                            log.warn("WatchKey could not be reset. Exiting...");
-                            watchService.close();
-                            break;
+                        try {
+                            if (!key.reset()) {
+                                log.warn("WatchKey could not be reset. 새 WatchKey 생성...");
+
+                                // 기존 WatchService 닫기
+                                watchService[0].close();
+
+                                // 새로운 WatchService 생성
+                                watchService[0] = FileSystems.getDefault().newWatchService();
+
+                                // 기존 디렉토리들을 다시 등록
+                                registerAllDirectories(sourcePath, watchService[0]);
+
+                                // 루프를 멈추지 않고 계속 실행하도록 key 등록
+                                continue;
+                            }
+                        } catch (ClosedWatchServiceException e) {
+                            log.error("WatchService가 닫혀서 재시작합니다.", e);
+
+                            // WatchService가 강제 종료되었으므로 다시 시작
+                            watchService[0] = FileSystems.getDefault().newWatchService();
+                            registerAllDirectories(sourcePath, watchService[0]);
+
+                            continue; // 새 WatchService로 계속 감시
                         }
+
                     }
                 } catch (IOException e) {
                     log.error("Error closing WatchService", e);
@@ -156,6 +177,7 @@ public class FileSyncController {
 //                dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE,
 //                        StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_DELETE);
 //                log.info("디렉토리 감시 등록됨: {}", dir);
+//
 //                return FileVisitResult.CONTINUE;
 //            }
 //        });
@@ -184,7 +206,7 @@ public class FileSyncController {
                 return;
             }
             remoteFileService.uploadFile(entry, path);
-            log.info("업로드 성공: {}", path);
+            //log.info("업로드 성공: {}", path);
         } catch (Exception e) {
             log.error("병렬 업로드 중 오류 발생: {}", path, e);
         }
@@ -195,7 +217,8 @@ public class FileSyncController {
         File f = file.toFile();
 
         // 파일이 존재하지 않지만 이름을 기준으로 디렉토리로 간주할 수 있음
-        if (!f.exists() || f.isDirectory()) {
+        //if (!f.exists() || f.isDirectory()) {
+        if (Files.isDirectory(file)) {
             log.info("디렉토리 감지: {}", file);
             remoteFileService.deleteDir(file.toString());
             return true;
@@ -233,6 +256,4 @@ public class FileSyncController {
             log.error("디렉토리 내 파일 업로드 중 오류 발생: {}", directory, e);
         }
     }
-
-
 }
